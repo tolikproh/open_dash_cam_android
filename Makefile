@@ -1,4 +1,4 @@
-JAVA_HOME ?= /usr/lib/jvm/java-8-openjdk-amd64
+JAVA_HOME ?= /usr/lib/jvm/java-21-openjdk-amd64
 ANDROID_SDK ?= $(HOME)/Android/Sdk
 GRADLEW := ./gradlew
 GRADLE := JAVA_HOME=$(JAVA_HOME) $(GRADLEW)
@@ -8,7 +8,7 @@ APK_RELEASE := mobile/build/outputs/apk/release/mobile-release.apk
 KEYSTORE := release.keystore
 KEYSTORE_PROPS := keystore.properties
 
-VERSION := $(shell grep 'versionName' mobile/build.gradle | sed -n 's/.*versionName "\([^"]*\)".*/\1/p' | head -1)
+VERSION := $(shell grep 'versionName' mobile/build.gradle | sed -n "s/.*versionName ['\"]\([^'\"]*\)['\"].*/\1/p" | head -1)
 TAG := v$(VERSION)
 APK_ASSET := open-dash-cam-$(TAG).apk
 GITHUB_NOTES ?= Release $(VERSION)

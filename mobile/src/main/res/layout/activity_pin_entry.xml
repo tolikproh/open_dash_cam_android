@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/pin_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/pin_enter_title"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/pin_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/pin_enter_message"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/pin_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/pin_hint"
+        android:importantForAutofill="no"
+        android:inputType="numberPassword"
+        android:maxLength="8" />
+
+    <EditText
+        android:id="@+id/pin_confirm_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/pin_confirm_hint"
+        android:importantForAutofill="no"
+        android:inputType="numberPassword"
+        android:maxLength="8"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/pin_cancel_button"
+            style="?attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/pin_cancel" />
+
+        <Button
+            android:id="@+id/pin_ok_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/pin_ok" />
+    </LinearLayout>
+
+</LinearLayout>

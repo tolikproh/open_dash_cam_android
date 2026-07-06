@@ -3,98 +3,105 @@ package com.opendashcam;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.Service;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
-import android.hardware.Camera;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.CountDownTimer;
 import android.os.Environment;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v4.os.EnvironmentCompat;
-import android.text.TextUtils;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
+
+import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.opendashcam.models.Recording;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
-
-/**
- * Global utility methods
- */
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class Util {
     public static final String ACTION_UPDATE_RECORDINGS_LIST = "update.recordings.list";
-    public static final int FOREGROUND_NOTIFICATION_ID = 51288;
+    public static final String ACTION_HIDE_OVERLAY = "hide.overlay";
+    public static final String ACTION_SHOW_OVERLAY = "show.overlay";
+    public static final int RECORDER_NOTIFICATION_ID = 51288;
+    public static final int WIDGET_NOTIFICATION_ID = 51289;
 
-    private static final String NOTIFICATIONS_CHANNEL_ID_MAIN_NOTIFICATIONS = "1001";
-    private static final String NOTIFICATIONS_CHANNEL_NAME_MAIN_NOTIFICATIONS = "Main notifications";
+    private static final String NOTIFICATIONS_CHANNEL_ID = "open_dash_cam_main";
 
-    private static int QUOTA = 1000; // megabytes
-    private static int QUOTA_WARNING_THRESHOLD = 200; // megabytes
-    private static int MAX_DURATION = 45000; // 45 seconds
-
-    public static File getVideosDirectoryPath() {
-        //remove an old directory if exists
-        File oldDirectory = new File(Environment.getExternalStorageDirectory() + "/OpenDashCam/");
-        removeNonEmptyDirectory(oldDirectory);
-
-        //New directory
-        File appVideosFolder = getAppPrivateVideosFolder(OpenDashApp.getAppContext());
-
-        if (appVideosFolder != null) {
-            //create app-private folder if not exists
-            if (!appVideosFolder.exists()) appVideosFolder.mkdir();
-            return appVideosFolder;
-        }
-
-        return null;
+    private static String getNotificationChannelName(Context context) {
+        return context.getString(R.string.notification_channel_name);
     }
 
     public static int getQuota() {
-        return QUOTA;
+        return RecordingPreferences.getStorageQuotaMb(OpenDashApp.getAppContext());
     }
 
     public static int getQuotaWarningThreshold() {
-        return QUOTA_WARNING_THRESHOLD;
+        return RecordingPreferences.getQuotaWarningThresholdMb(OpenDashApp.getAppContext());
     }
 
     public static int getMaxDuration() {
-        return MAX_DURATION;
+        return (int) RecordingPreferences.getSegmentDurationMs(OpenDashApp.getAppContext());
     }
 
-    /**
-     * Displays toast message of LONG length
-     *
-     * @param context Application context
-     * @param msg     Message to display
-     */
+    private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    private Util() {
+    }
+
+    public static File getVideosDirectoryPath() {
+        return StorageHelper.getVideosDirectoryPath(OpenDashApp.getAppContext());
+    }
+
+    public static long getFolderSizeMb(File file) {
+        long sizeBytes = getFolderSizeBytes(file);
+        return sizeBytes / (1024 * 1024);
+    }
+
+    private static long getFolderSizeBytes(File file) {
+        if (file == null || !file.exists()) {
+            return 0;
+        }
+        if (file.isFile()) {
+            return file.length();
+        }
+        long size = 0;
+        File[] children = file.listFiles();
+        if (children == null) {
+            return 0;
+        }
+        for (File child : children) {
+            size += getFolderSizeBytes(child);
+        }
+        return size;
+    }
+
+    public static long getFreeSpaceMb(File storagePath) {
+        if (storagePath == null || !storagePath.exists()) {
+            return 0;
+        }
+        return storagePath.getFreeSpace() / (1024 * 1024);
+    }
+
     public static void showToast(Context context, String msg) {
         Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
     }
 
-    /**
-     * Display a 9-seconds-long toast.
-     * Inspired by https://stackoverflow.com/a/7173248
-     *
-     * @param context Application context
-     * @param msg     Message to display
-     */
     public static void showToastLong(Context context, String msg) {
         final Toast tag = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
-
         tag.show();
-
         new CountDownTimer(9000, 1000) {
-
             public void onTick(long millisUntilFinished) {
                 tag.show();
             }
@@ -102,16 +109,9 @@ public final class Util {
             public void onFinish() {
                 tag.show();
             }
-
         }.start();
     }
 
-    /**
-     * Starts new activity to open speicified file
-     *
-     * @param file     File to open
-     * @param mimeType Mime type of the file to open
-     */
     public static void openFile(Context context, Uri file, String mimeType) {
         Intent openFile = new Intent(Intent.ACTION_VIEW);
         openFile.setDataAndType(file, mimeType);
@@ -120,191 +120,158 @@ public final class Util {
         try {
             context.startActivity(openFile);
         } catch (ActivityNotFoundException e) {
-            Log.i("OpenDashCam", "Cannot open file.");
+            Context appContext = context.getApplicationContext();
+            Log.i("OpenDashCam", appContext.getString(R.string.cannot_open_file));
         }
     }
 
-    /**
-     * Calculates the size of a directory in megabytes
-     *
-     * @param file The directory to calculate the size of
-     * @return size of a directory in megabytes
-     */
-    public static long getFolderSize(File file) {
-        long size = 0;
-        if (file.isDirectory()) {
-            for (File fileInDirectory : file.listFiles()) {
-                size += getFolderSize(fileInDirectory);
-            }
-        } else {
-            size = file.length();
-        }
-        return size / 1024;
-    }
-
-    /**
-     * Get available space on the device
-     *
-     * @return
-     */
-    public static long getFreeSpaceExternalStorage(File storagePath) {
-        if (storagePath == null || !storagePath.isDirectory()) return 0;
-        return storagePath.getFreeSpace() / 1024 / 1024;
-    }
-
-    /**
-     * Delete all recordings from storage and sqlite
-     * <p>
-     * NOTE: called from UI settings (here uses asynctask for background operation)
-     */
     public static void deleteRecordings() {
-        AsyncTaskCompat.executeParallel(new DeleteRecordingsTask());
+        BACKGROUND_EXECUTOR.execute(new DeleteRecordingsTask());
     }
 
-    /**
-     * Star/unstar recording
-     * <p>
-     * NOTE: called from UI (uses asynctasks)
-     *
-     * @param recording
-     */
     public static void updateStar(Recording recording) {
-        AsyncTaskCompat.executeParallel(new UpdateStarTask(recording));
+        BACKGROUND_EXECUTOR.execute(new UpdateStarTask(recording));
     }
 
-    /**
-     * Delete single recording from storage and SQLite
-     * <p>
-     * NOTE: called from background thread (BackgroundVideoRecorder)
-     *
-     * @param recording Recording
-     */
     public static void deleteSingleRecording(Recording recording) {
-        if (recording == null) return;
-        //delete from storage
-        new File(recording.getFilePath()).delete();
-
-        //delete from db
-        DBHelper.getInstance(OpenDashApp.getAppContext()).deleteRecording(
-                new Recording(recording.getFilePath())
-        );
-
-        //broadcast for updating videos list in UI
+        if (recording == null) {
+            return;
+        }
+        StorageHelper.deleteRecordingAtPath(OpenDashApp.getAppContext(), recording.getFilePath());
+        DBHelper.getInstance(OpenDashApp.getAppContext()).deleteRecording(recording);
         LocalBroadcastManager.getInstance(OpenDashApp.getAppContext()).sendBroadcast(
                 new Intent(ACTION_UPDATE_RECORDINGS_LIST)
         );
     }
 
-    /**
-     * Insert new recording to SQLite
-     * <p>
-     * NOTE: called from background thread (BackgroundVideoRecorder)
-     *
-     * @param recording Recording
-     */
     public static void insertNewRecording(Recording recording) {
-        if (recording == null) return;
-        DBHelper.getInstance(OpenDashApp.getAppContext()).insertNewRecording(recording);
-
-        //broadcast for updating videos list in UI
+        if (recording == null) {
+            return;
+        }
+        if (!DBHelper.getInstance(OpenDashApp.getAppContext()).insertNewRecording(recording)) {
+            return;
+        }
         LocalBroadcastManager.getInstance(OpenDashApp.getAppContext()).sendBroadcast(
                 new Intent(ACTION_UPDATE_RECORDINGS_LIST)
         );
     }
 
-
-    /**
-     * Iterate over supported camera video sizes to see which one best fits the
-     * dimensions of the given view while maintaining the aspect ratio. If none can,
-     * be lenient with the aspect ratio.
-     *
-     * @param supportedVideoSizes Supported camera video sizes.
-     * @param previewSizes        Supported camera preview sizes.
-     * @param w                   The width of the view.
-     * @param h                   The height of the view.
-     * @return Best match camera video size to fit in the view.
-     */
-    public static Camera.Size getOptimalVideoSize(List<Camera.Size> supportedVideoSizes,
-                                                  List<Camera.Size> previewSizes, int w, int h) {
-        // Use a very small tolerance because we want an exact match.
-        final double ASPECT_TOLERANCE = 0.1;
-        double targetRatio = (double) 16 / 9;//(double) w / h;
-
-        // Supported video sizes list might be null, it means that we are allowed to use the preview
-        // sizes
-        List<Camera.Size> videoSizes;
-        if (supportedVideoSizes != null) {
-            videoSizes = supportedVideoSizes;
-        } else {
-            videoSizes = previewSizes;
-        }
-        Camera.Size optimalSize = null;
-
-        // Start with max value and refine as we iterate over available video sizes. This is the
-        // minimum difference between view and camera height.
-        double minDiff = Double.MAX_VALUE;
-
-        // Target view height
-        int targetHeight = h;
-
-        // Try to find a video size that matches aspect ratio and the target view size.
-        // Iterate over all available sizes and pick the largest size that can fit in the view and
-        // still maintain the aspect ratio.
-        for (Camera.Size size : videoSizes) {
-            //we need max size 1280x720
-            if (size.width == 1920) continue;
-
-            double ratio = (double) size.width / size.height;
-
-            if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE)
-                continue;
-
-            if (Math.abs(size.height - targetHeight) < minDiff && previewSizes.contains(size)) {
-                optimalSize = size;
-                minDiff = Math.abs(size.height - targetHeight);
-            }
-        }
-
-        // Cannot find video size that matches the aspect ratio, ignore the requirement
-        if (optimalSize == null) {
-            minDiff = Double.MAX_VALUE;
-            for (Camera.Size size : videoSizes) {
-                if (Math.abs(size.height - targetHeight) < minDiff && previewSizes.contains(size)) {
-                    optimalSize = size;
-                    minDiff = Math.abs(size.height - targetHeight);
-                }
-            }
-        }
-
-        return optimalSize;
+    public static void restartBackgroundRecorder(Context context) {
+        Context appContext = context.getApplicationContext();
+        appContext.stopService(new Intent(appContext, BackgroundVideoRecorder.class));
+        new Handler(Looper.getMainLooper()).post(() ->
+                ContextCompat.startForegroundService(
+                        appContext,
+                        new Intent(appContext, BackgroundVideoRecorder.class)
+                )
+        );
     }
 
-    /**
-     * Create notification for status bar
-     *
-     * @param context Context
-     * @return Notification
-     */
+    public static void hideOverlay(Context context) {
+        LocalBroadcastManager.getInstance(context).sendBroadcast(
+                new Intent(ACTION_HIDE_OVERLAY)
+        );
+    }
+
+    public static void showOverlay(Context context) {
+        LocalBroadcastManager.getInstance(context).sendBroadcast(
+                new Intent(ACTION_SHOW_OVERLAY)
+        );
+    }
+
+    public static boolean isWidgetServiceRunning(Context context) {
+        android.app.ActivityManager manager =
+                (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (manager == null) {
+            return false;
+        }
+        for (android.app.ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (WidgetService.class.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean isBackgroundRecorderRunning(Context context) {
+        android.app.ActivityManager manager =
+                (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (manager == null) {
+            return false;
+        }
+        for (android.app.ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (BackgroundVideoRecorder.class.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static int foregroundServiceTypeMicrophone() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+        }
+        return 0;
+    }
+
+    public static int foregroundServiceTypeMicrophoneAndLocation(Context context) {
+        int type = foregroundServiceTypeMicrophone();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                && hasLocationPermission(context)) {
+            type |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+        }
+        return type;
+    }
+
+    public static int getRecorderForegroundServiceType(Context context) {
+        if (RecordingPreferences.isAudioMode(context)) {
+            return foregroundServiceTypeMicrophone();
+        }
+        if (RecordingPreferences.isAudioMarkerMode(context)) {
+            return foregroundServiceTypeMicrophoneAndLocation(context);
+        }
+        return foregroundServiceTypeCameraMicrophoneAndLocation(context);
+    }
+
+    public static boolean hasLocationPermission(Context context) {
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
     public static Notification createStatusBarNotification(Context context) {
+        int titleRes;
+        int textRes;
+        if (RecordingPreferences.isAudioMode(context)) {
+            titleRes = R.string.notification_title_audio;
+            textRes = R.string.notification_text_audio;
+        } else if (RecordingPreferences.isAudioMarkerMode(context)) {
+            titleRes = R.string.notification_title_audio_marker;
+            textRes = R.string.notification_text_audio_marker;
+        } else {
+            titleRes = R.string.notification_title;
+            textRes = R.string.notification_text;
+        }
         NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
         NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(
                 context,
-                NOTIFICATIONS_CHANNEL_ID_MAIN_NOTIFICATIONS)
-                .setContentTitle(context.getResources().getString(R.string.notification_title))
-                .setContentText(context.getResources().getString(R.string.notification_text))
+                NOTIFICATIONS_CHANNEL_ID)
+                .setContentTitle(context.getResources().getString(titleRes))
+                .setContentText(context.getResources().getString(textRes))
                 .setSmallIcon(R.drawable.ic_videocam_red_128dp)
+                .setOngoing(true)
                 .setAutoCancel(false);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
             NotificationChannel channel = new NotificationChannel(
-                    NOTIFICATIONS_CHANNEL_ID_MAIN_NOTIFICATIONS,
-                    NOTIFICATIONS_CHANNEL_NAME_MAIN_NOTIFICATIONS,
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NOTIFICATIONS_CHANNEL_ID,
+                    getNotificationChannelName(context),
+                    NotificationManager.IMPORTANCE_LOW
             );
             channel.enableVibration(false);
-            channel.setVibrationPattern(null);
             channel.setSound(null, null);
             notificationManager.createNotificationChannel(channel);
         }
@@ -312,65 +279,101 @@ public final class Util {
         return notificationBuilder.build();
     }
 
-    /**
-     * Get path to app-private folder (Android/data/[app name]/files)
-     *
-     * @param context Context
-     * @return Folder
-     */
+    public static int foregroundServiceTypeCameraAndMicrophone() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    | android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+        }
+        return 0;
+    }
+
+    public static int foregroundServiceTypeCameraMicrophoneAndLocation(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            int type = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    | android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                    && hasLocationPermission(context)) {
+                type |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+            }
+            return type;
+        }
+        return 0;
+    }
+
+    public static int foregroundServiceTypeSpecialUse() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE;
+        }
+        return 0;
+    }
+
+    public static void startForeground(Service service, int notificationId, Notification notification, int type) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && type != 0) {
+            try {
+                service.startForeground(notificationId, notification, type);
+                return;
+            } catch (RuntimeException e) {
+                Log.w(Util.class.getSimpleName(), "startForeground failed with type flags, retrying", e);
+                int fallbackType = type & ~android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+                if (fallbackType != type && fallbackType != 0) {
+                    try {
+                        service.startForeground(notificationId, notification, fallbackType);
+                        return;
+                    } catch (RuntimeException retryError) {
+                        Log.w(Util.class.getSimpleName(), "startForeground fallback failed", retryError);
+                    }
+                }
+            }
+        }
+        service.startForeground(notificationId, notification);
+    }
+
+    public static void stopForeground(Service service) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            service.stopForeground(Service.STOP_FOREGROUND_REMOVE);
+        } else {
+            service.stopForeground(true);
+        }
+    }
+
     private static File getAppPrivateVideosFolder(Context context) {
         try {
             File[] extAppFolders = ContextCompat.getExternalFilesDirs(context, Environment.DIRECTORY_MOVIES);
-            if (extAppFolders == null) return null;
-
-            for (File file : extAppFolders) {
-                if (file != null) {
-                    //find external app-private folder (emulated - it's internal storage)
-                    if (!file.getAbsolutePath().toLowerCase().contains("emulated") && isStorageMounted(file)) {
-                        return file;
-                    }
-                }
-            }
-
-            //if external storage is not found
-            if (extAppFolders.length > 0) {
-                File appFolder;
-                //get available app-private folder form the list
-                for (int i = extAppFolders.length - 1, j = 0; i >= j; i--) {
-                    appFolder = extAppFolders[i];
-                    if (appFolder != null && isStorageMounted(appFolder)) {
-                        return appFolder;
-                    }
-                }
-            } else {
+            if (extAppFolders == null) {
                 return null;
             }
+
+            for (File file : extAppFolders) {
+                if (file != null
+                        && !file.getAbsolutePath().toLowerCase().contains("emulated")
+                        && isStorageMounted(file)) {
+                    return file;
+                }
+            }
+
+            for (int i = extAppFolders.length - 1; i >= 0; i--) {
+                File appFolder = extAppFolders[i];
+                if (appFolder != null && isStorageMounted(appFolder)) {
+                    return appFolder;
+                }
+            }
         } catch (Exception e) {
-            Log.e(Util.class.getSimpleName(), "getAppPrivateVideosFolder: Exception - " + e.getLocalizedMessage(), e);
+            Log.e(Util.class.getSimpleName(), "getAppPrivateVideosFolder failed", e);
         }
         return null;
     }
 
-    /**
-     * Check if storage mounted and has read/write access.
-     *
-     * @param storagePath Storage path
-     * @return True - can write data
-     */
     private static boolean isStorageMounted(File storagePath) {
-        String storageState = EnvironmentCompat.getStorageState(storagePath);
-        return storageState.equals(Environment.MEDIA_MOUNTED);
+        return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState(storagePath));
     }
 
-    /**
-     * Remove non-empty directory
-     *
-     * @param path Directory path
-     * @return True - Removed
-     */
     private static boolean removeNonEmptyDirectory(File path) {
-        if (path.exists()) {
-            for (File file : path.listFiles()) {
+        if (path == null || !path.exists()) {
+            return false;
+        }
+        File[] files = path.listFiles();
+        if (files != null) {
+            for (File file : files) {
                 if (file.isDirectory()) {
                     removeNonEmptyDirectory(file);
                 } else {
@@ -381,74 +384,43 @@ public final class Util {
         return path.delete();
     }
 
-
-    /**
-     * AsyncTask for delete recordings from storage and SQLite
-     */
-    private static class DeleteRecordingsTask extends AsyncTask<Void, Void, Boolean> {
-
+    private static class DeleteRecordingsTask implements Runnable {
         @Override
-        protected Boolean doInBackground(Void... voids) {
-            DBHelper dbHelper = DBHelper.getInstance(OpenDashApp.getAppContext());
-
-            //select all saved recordings for removing files from storage
+        public void run() {
+            Context context = OpenDashApp.getAppContext();
+            DBHelper dbHelper = DBHelper.getInstance(context);
             ArrayList<Recording> recordingsList = dbHelper.selectAllRecordingsList();
-
-            //remove items from SQLite database
             boolean result = dbHelper.deleteAllRecordings();
 
             if (result) {
-                File videoFile;
-                //remove files from storage
                 for (Recording recording : recordingsList) {
-                    videoFile = !TextUtils.isEmpty(recording.getFilePath()) ? new File(recording.getFilePath()) : null;
-                    if (videoFile != null) {
-                        videoFile.delete();
-                    }
+                    StorageHelper.deleteRecordingAtPath(context, recording.getFilePath());
                 }
             }
 
-            return result;
-        }
-
-        @Override
-        protected void onPostExecute(Boolean aBoolean) {
-            Context context = OpenDashApp.getAppContext();
             Resources res = context.getResources();
-            Util.showToastLong(
+            showToastLong(
                     context,
-                    aBoolean
+                    result
                             ? res.getString(R.string.pref_delete_recordings_confirmation)
                             : res.getString(R.string.recordings_list_empty_message_title)
             );
         }
     }
 
-    /**
-     * AsyncTask for star/unstar
-     */
-    private static class UpdateStarTask extends AsyncTask<Void, Void, Void> {
-        private Recording mRecording;
+    private static class UpdateStarTask implements Runnable {
+        private final Recording recording;
 
         UpdateStarTask(Recording recording) {
-            mRecording = recording;
+            this.recording = recording;
         }
 
         @Override
-        protected Void doInBackground(Void... voids) {
-            DBHelper dbHelper = DBHelper.getInstance(OpenDashApp.getAppContext());
-            //insert or delete star
-            dbHelper.updateStar(mRecording);
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            //broadcast for updating videos list in UI
+        public void run() {
+            DBHelper.getInstance(OpenDashApp.getAppContext()).updateStar(recording);
             LocalBroadcastManager.getInstance(OpenDashApp.getAppContext()).sendBroadcast(
-                    new Intent(Util.ACTION_UPDATE_RECORDINGS_LIST)
+                    new Intent(ACTION_UPDATE_RECORDINGS_LIST)
             );
         }
     }
-
 }

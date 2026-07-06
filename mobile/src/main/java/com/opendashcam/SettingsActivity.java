@@ -1,160 +1,307 @@
 package com.opendashcam;
 
-
-import android.annotation.TargetApi;
-import android.content.Context;
-import android.content.res.Configuration;
-import android.os.Build;
+import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.PreferenceActivity;
-import android.preference.PreferenceFragment;
-import android.preference.PreferenceManager;
-import android.support.v7.app.ActionBar;
 import android.view.MenuItem;
 
-/**
- * A {@link PreferenceActivity} that presents a set of application settings. On
- * handset devices, settings are presented as a single list. On tablets,
- * settings are split by category, with category headers shown to the left of
- * the list of settings.
- * <p>
- * See <a href="http://developer.android.com/design/patterns/settings.html">
- * Android Design: Settings</a> for design guidelines and the <a
- * href="http://developer.android.com/guide/topics/ui/settings.html">Settings
- * API Guide</a> for more information on developing a Settings UI.
- */
-public class SettingsActivity extends AppCompatPreferenceActivity {
-    /**
-     * A preference value change listener that updates the preference's summary
-     * to reflect its new value.
-     */
-    private static Preference.OnPreferenceChangeListener sBindPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
-        @Override
-        public boolean onPreferenceChange(Preference preference, Object value) {
-            String stringValue = value.toString();
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.ListPreference;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.SwitchPreferenceCompat;
 
-            if (preference instanceof ListPreference) {
-                // For list preferences, look up the correct display value in
-                // the preference's 'entries' list.
-                ListPreference listPreference = (ListPreference) preference;
-                int index = listPreference.findIndexOfValue(stringValue);
+public class SettingsActivity extends AppCompatActivity {
 
-                // Set the summary to reflect the new value.
-                preference.setSummary(
-                        index >= 0
-                                ? listPreference.getEntries()[index]
-                                : null);
-            } else {
-                // For all other preferences, set the summary to the value's
-                // simple string representation.
-                preference.setSummary(stringValue);
-            }
-            return true;
-        }
-    };
-
-    /**
-     * Helper method to determine if the device has an extra-large screen. For
-     * example, 10" tablets are extra-large.
-     */
-    private static boolean isXLargeTablet(Context context) {
-        return (context.getResources().getConfiguration().screenLayout
-                & Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_XLARGE;
-    }
-
-    /**
-     * Binds a preference's summary to its value. More specifically, when the
-     * preference's value is changed, its summary (line of text below the
-     * preference title) is updated to reflect the value. The summary is also
-     * immediately updated upon calling this method. The exact display format is
-     * dependent on the type of preference.
-     *
-     * @see #sBindPreferenceSummaryToValueListener
-     */
-    private static void bindPreferenceSummaryToValue(Preference preference) {
-        // Set the listener to watch for value changes.
-        preference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-
-        // Trigger the listener immediately with the preference's
-        // current value.
-        sBindPreferenceSummaryToValueListener.onPreferenceChange(preference,
-                PreferenceManager
-                        .getDefaultSharedPreferences(preference.getContext())
-                        .getString(preference.getKey(), ""));
-    }
+    private final OverlayLifecycle overlayLifecycle = new OverlayLifecycle();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        RecordingOrientationHelper.applyActivityOrientation(this);
         super.onCreate(savedInstanceState);
+        overlayLifecycle.onCreate(this);
         setupActionBar();
-
-        // Display the fragment as the main content.
-        getFragmentManager().beginTransaction()
-                .replace(android.R.id.content, new GeneralPreferenceFragment())
-                .commit();
+        if (savedInstanceState == null) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(android.R.id.content, new GeneralPreferenceFragment())
+                    .commit();
+        }
     }
 
-    /**
-     * Set up the {@link android.app.ActionBar}, if the API is available.
-     */
     private void setupActionBar() {
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            // Show the Up button in the action bar.
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public boolean onIsMultiPane() {
-        return isXLargeTablet(this);
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
-    /**
-     * This method stops fragment injection in malicious applications.
-     * Make sure to deny any unknown fragments here.
-     */
-    protected boolean isValidFragment(String fragmentName) {
-        return PreferenceFragment.class.getName().equals(fragmentName)
-                || GeneralPreferenceFragment.class.getName().equals(fragmentName);
+    @Override
+    protected void onDestroy() {
+        overlayLifecycle.onDestroy(this);
+        super.onDestroy();
     }
 
-    /**
-     * This fragment shows general preferences only. It is used when the
-     * activity is showing a two-pane settings UI.
-     */
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
-    public static class GeneralPreferenceFragment extends PreferenceFragment {
+    public static class GeneralPreferenceFragment extends PreferenceFragmentCompat {
+
+        private ActivityResultLauncher<Intent> folderPickerLauncher;
+        private ActivityResultLauncher<Intent> pinSetupLauncher;
+
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
-            addPreferencesFromResource(R.xml.pref_general);
-            setHasOptionsMenu(true);
 
-            Preference pref = findPreference("delete_recordings");
-            pref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            folderPickerLauncher = registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                            StorageHelper.setCustomFolderUri(requireContext(), result.getData().getData());
+                            updateFolderSummary();
+                            updateStorageQuotaPreference();
+                        }
+                    }
+            );
 
-                @Override
-                public boolean onPreferenceClick(Preference preference) {
-                    Util.deleteRecordings();
-                    return false;
-                }
-            });
+            pinSetupLauncher = registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> updatePinPreferences()
+            );
         }
 
         @Override
-        public boolean onOptionsItemSelected(MenuItem item) {
-            int id = item.getItemId();
-            if (id == android.R.id.home) {
-                getActivity().finish();
-                return true;
+        public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+            setPreferencesFromResource(R.xml.pref_general, rootKey);
+            bindPreferences();
+        }
+
+        @Override
+        public void onResume() {
+            super.onResume();
+            updateFolderSummary();
+            updatePinPreferences();
+            updateStorageQuotaPreference();
+            updateRecordingPreferenceSummaries();
+        }
+
+        private void bindPreferences() {
+            Preference chooseFolderPref = findPreference("choose_recordings_folder");
+            if (chooseFolderPref != null) {
+                chooseFolderPref.setOnPreferenceClickListener(preference -> {
+                    folderPickerLauncher.launch(StorageHelper.createFolderPickerIntent());
+                    return true;
+                });
             }
-            return super.onOptionsItemSelected(item);
+
+            Preference resetFolderPref = findPreference("reset_recordings_folder");
+            if (resetFolderPref != null) {
+                resetFolderPref.setOnPreferenceClickListener(preference -> {
+                    StorageHelper.clearCustomFolder(requireContext());
+                    updateFolderSummary();
+                    updateStorageQuotaPreference();
+                    return true;
+                });
+            }
+
+            Preference setupPinPref = findPreference("setup_pin");
+            if (setupPinPref != null) {
+                setupPinPref.setOnPreferenceClickListener(preference -> {
+                    pinSetupLauncher.launch(PinManager.createSetupIntent(requireContext()));
+                    return true;
+                });
+            }
+
+            Preference deletePref = findPreference("delete_recordings");
+            if (deletePref != null) {
+                deletePref.setOnPreferenceClickListener(preference -> {
+                    if (PinManager.isRequiredFor(requireContext(), PinManager.ACTION_DELETE_RECORDINGS)) {
+                        requireActivity().startActivity(PinManager.createVerifyIntent(
+                                requireContext(),
+                                PinManager.ACTION_DELETE_RECORDINGS
+                        ));
+                    } else {
+                        Util.deleteRecordings();
+                    }
+                    return true;
+                });
+            }
+
+            bindPinRequirementSwitch("pin_require_app_start", PinManager.ACTION_APP_START);
+            bindPinRequirementSwitch("pin_require_stop", PinManager.ACTION_STOP_RECORDING);
+            bindPinRequirementSwitch("pin_require_delete", PinManager.ACTION_DELETE_RECORDINGS);
+
+            SwitchPreferenceCompat pinEnabled = findPreference("pin_enabled");
+            if (pinEnabled != null) {
+                pinEnabled.setOnPreferenceChangeListener((preference, newValue) -> {
+                    if ((Boolean) newValue && !PinManager.isPinSet(requireContext())) {
+                        pinSetupLauncher.launch(PinManager.createSetupIntent(requireContext()));
+                        return false;
+                    }
+                    PinManager.setEnabled(requireContext(), (Boolean) newValue);
+                    updatePinPreferences();
+                    return true;
+                });
+            }
+
+            bindListPreferenceSummary(RecordingPreferences.KEY_SEGMENT_DURATION_MIN);
+            bindStorageQuotaPreference();
+            bindListPreferenceSummary(RecordingPreferences.KEY_VIDEO_RESOLUTION);
+            bindListPreferenceSummary(RecordingPreferences.KEY_VIDEO_ORIENTATION);
+            bindListPreferenceSummary(RecordingPreferences.KEY_APP_MODE);
+
+            ListPreference appModePref = findPreference(RecordingPreferences.KEY_APP_MODE);
+            if (appModePref != null) {
+                appModePref.setOnPreferenceChangeListener((pref, newValue) -> {
+                    // Restart after the new mode is persisted (listener runs before save).
+                    requireView().post(() -> {
+                        Util.restartBackgroundRecorder(requireContext());
+                        updateRecordingPreferenceSummaries();
+                        updateModeDependentPreferences();
+                    });
+                    return true;
+                });
+            }
+        }
+
+        private void updateModeDependentPreferences() {
+            boolean videoMode = RecordingPreferences.isVideoMode(requireContext());
+
+            SwitchPreferenceCompat videoAudioPref = findPreference(RecordingPreferences.KEY_VIDEO_RECORD_AUDIO);
+            if (videoAudioPref != null) {
+                videoAudioPref.setVisible(videoMode);
+            }
+
+            ListPreference resolutionPref = findPreference(RecordingPreferences.KEY_VIDEO_RESOLUTION);
+            if (resolutionPref != null) {
+                resolutionPref.setVisible(videoMode);
+            }
+
+            ListPreference orientationPref = findPreference(RecordingPreferences.KEY_VIDEO_ORIENTATION);
+            if (orientationPref != null) {
+                orientationPref.setVisible(videoMode);
+            }
+        }
+
+        private void bindListPreferenceSummary(String key) {
+            ListPreference preference = findPreference(key);
+            if (preference == null) {
+                return;
+            }
+            preference.setOnPreferenceChangeListener((pref, newValue) -> {
+                updateRecordingPreferenceSummaries();
+                return true;
+            });
+        }
+
+        private void bindStorageQuotaPreference() {
+            ListPreference quotaPref = findPreference(RecordingPreferences.KEY_STORAGE_QUOTA_MB);
+            if (quotaPref == null) {
+                return;
+            }
+            updateStorageQuotaPreference();
+            quotaPref.setOnPreferenceChangeListener((pref, newValue) -> {
+                updateRecordingPreferenceSummaries();
+                return true;
+            });
+        }
+
+        private void updateStorageQuotaPreference() {
+            ListPreference quotaPref = findPreference(RecordingPreferences.KEY_STORAGE_QUOTA_MB);
+            if (quotaPref == null) {
+                return;
+            }
+
+            StorageQuotaHelper.QuotaOptionList options =
+                    StorageQuotaHelper.buildOptions(requireContext());
+            quotaPref.setEntries(options.entries);
+            quotaPref.setEntryValues(options.values);
+
+            String storedValue = RecordingPreferences.getStorageQuotaStoredValue(requireContext());
+            String normalizedValue = StorageQuotaHelper.normalizeStoredValue(requireContext(), storedValue);
+            if (!normalizedValue.equals(storedValue)) {
+                quotaPref.setValue(normalizedValue);
+            } else if (quotaPref.getValue() == null) {
+                quotaPref.setValue(normalizedValue);
+            }
+        }
+
+        private void updateRecordingPreferenceSummaries() {
+            ListPreference appModePref = findPreference(RecordingPreferences.KEY_APP_MODE);
+            if (appModePref != null) {
+                appModePref.setSummary(RecordingPreferences.getAppModeSummary(requireContext()));
+            }
+
+            ListPreference segmentPref = findPreference(RecordingPreferences.KEY_SEGMENT_DURATION_MIN);
+            if (segmentPref != null) {
+                segmentPref.setSummary(RecordingPreferences.getSegmentDurationSummary(requireContext()));
+            }
+
+            ListPreference quotaPref = findPreference(RecordingPreferences.KEY_STORAGE_QUOTA_MB);
+            if (quotaPref != null) {
+                quotaPref.setSummary(RecordingPreferences.getStorageQuotaSummary(requireContext()));
+            }
+
+            ListPreference resolutionPref = findPreference(RecordingPreferences.KEY_VIDEO_RESOLUTION);
+            if (resolutionPref != null) {
+                resolutionPref.setSummary(RecordingPreferences.getVideoResolutionSummary(requireContext()));
+            }
+
+            ListPreference orientationPref = findPreference(RecordingPreferences.KEY_VIDEO_ORIENTATION);
+            if (orientationPref != null) {
+                orientationPref.setSummary(RecordingOrientationHelper.getSummary(requireContext()));
+            }
+
+            updateModeDependentPreferences();
+        }
+
+        private void updateFolderSummary() {
+            Preference chooseFolderPref = findPreference("choose_recordings_folder");
+            if (chooseFolderPref != null) {
+                chooseFolderPref.setSummary(StorageHelper.getFolderSummary(requireContext()));
+            }
+        }
+
+        private void bindPinRequirementSwitch(String key, String action) {
+            SwitchPreferenceCompat pref = findPreference(key);
+            if (pref == null) {
+                return;
+            }
+            pref.setOnPreferenceChangeListener((preference, newValue) -> {
+                PinManager.setRequirement(requireContext(), action, (Boolean) newValue);
+                return true;
+            });
+        }
+
+        private void updatePinPreferences() {
+            boolean pinSet = PinManager.isPinSet(requireContext());
+            SwitchPreferenceCompat pinEnabled = findPreference("pin_enabled");
+            if (pinEnabled != null) {
+                pinEnabled.setEnabled(pinSet);
+                pinEnabled.setChecked(PinManager.isEnabled(requireContext()));
+            }
+
+            updatePinRequirementSwitch("pin_require_app_start", PinManager.ACTION_APP_START);
+            updatePinRequirementSwitch("pin_require_stop", PinManager.ACTION_STOP_RECORDING);
+            updatePinRequirementSwitch("pin_require_delete", PinManager.ACTION_DELETE_RECORDINGS);
+        }
+
+        private void updatePinRequirementSwitch(String key, String action) {
+            SwitchPreferenceCompat pref = findPreference(key);
+            if (pref != null) {
+                pref.setEnabled(PinManager.isEnabled(requireContext()) && PinManager.isPinSet(requireContext()));
+                pref.setChecked(PinManager.isRequiredFor(requireContext(), action));
+            }
         }
     }
 }

@@ -1,63 +1,143 @@
 <resources>
     <string name="app_name">Open Dash Cam</string>
 
-    <!-- DB Keys -->
+    <!-- DB Keys (не переводятся) -->
     <string name="db_first_launch_complete_flag">FIRST_LAUNCH_FLAG</string>
     <string name="current_recordings_preferences_key">com.opendashcam.CURRENT_RECORDINGS</string>
     <string name="previous_recording_preferences_key">PREVIOUS_RECORDING</string>
     <string name="current_recording_preferences_key">CURRENT_RECORDING</string>
     <string name="pre_start_volume">PRE_START_VOLUME</string>
 
-    <!-- Welcome view -->
-    <string name="app_pitchline">Open Dash Cam is your\n eyewitness on the road.</string>
-    <string name="app_brief_description">While navigating with Google Maps or any other
-        application in the background, Open Dash Cam will record what happens on the road using
-        your phone camera.</string>
+    <!-- Приветствие -->
+    <string name="welcome_get_started">Начнём</string>
+    <string name="welcome_swipe_left">Смахните влево, чтобы продолжить</string>
+    <string name="welcome_touch_rec">Нажмите красный виджет «REC», чтобы продолжить</string>
+    <string name="welcome_folder_title">Папка для записей</string>
+    <string name="welcome_folder_desc">Выберите, где сохранять видео и аудио. Позже это можно изменить в настройках.</string>
+    <string name="welcome_folder_current">Текущая папка:</string>
+    <string name="welcome_folder_choose">Выбрать папку</string>
+    <string name="welcome_folder_use_default">Использовать папку по умолчанию</string>
+    <string name="welcome_folder_next">Далее</string>
+    <string name="app_pitchline">Open Dash Cam — ваш\nсвидетель на дороге.</string>
+    <string name="app_brief_description">Пока вы пользуетесь Google Картами или другим приложением,
+        Open Dash Cam записывает происходящее на дороге камерой телефона.</string>
 
-    <string name="recording_automatic_heading">Recording starts automatically</string>
-    <string name="recording_automatic_desc">When you start the app, the red \"REC\" widget will
-        appear, indicating that video recording has started.\n\n
-        Google Maps will start in the background, so you can navigate while the dash cam is
-        recording.</string>
+    <string name="recording_automatic_heading">Запись начинается автоматически</string>
+    <string name="recording_automatic_desc">При запуске приложения появится красный виджет «REC» —
+        это значит, что видеозапись уже идёт.\n\n
+        Google Карты могут запуститься в фоне, чтобы вы могли ехать с навигацией.</string>
 
-    <string name="other_widgets_heading">\"REC\" opens app menu</string>
-    <string name="other_widgets_view_rec_desc">\"View recordings\" will show all videos
-        recorded</string>
-    <string name="other_widgets_save_rec_desc">Use \"Save recording\" if you captured an
-        important moment</string>
-    <string name="btn_start_driving">Start driving</string>
+    <string name="other_widgets_heading">«REC» открывает меню</string>
+    <string name="other_widgets_view_rec_desc">«Просмотр записей» — список всех видео</string>
+    <string name="other_widgets_save_rec_desc">«Сохранить запись» — отметить важный момент</string>
+    <string name="btn_start_driving">Начать поездку</string>
 
-    <!-- Save recording rootView -->
-    <string name="save_recording_success_msg">Current recording marked as starred.
-Starred recordings will not be deleted.</string>
-    <string name="title_activity_settings">Settings</string>
+    <!-- Виджет -->
+    <string name="save_recording_success_msg">Текущая запись отмечена звёздочкой.\nОтмеченные записи не удаляются автоматически.</string>
+    <string name="title_activity_settings">Настройки</string>
+    <string name="title_activity_welcome">Добро пожаловать</string>
 
-    <!-- Settings -->
-    <string name="pref_title_rotate">Rotate recordings 90 degrees</string>
-    <string name="pref_description_rotate">Some devices record videos in the flipped mode.
-        If that is the case, enable this setting
-    </string>
+    <!-- Настройки -->
+    <string name="pref_title_rotate">Повернуть записи на 90°</string>
+    <string name="pref_description_rotate">На некоторых устройствах видео записывается перевёрнутым.
+        Включите, если это ваш случай.</string>
 
-    <string name="pref_title_silent">Silent</string>
-    <string name="pref_description_silent">Puts your phone in silent mode while running to disable
-        camera sound when recording starts and stops
-    </string>
+    <string name="pref_title_silent">Без звука</string>
+    <string name="pref_description_silent">Приглушает системные звуки во время записи (громкость системы). Доступ к режиму «Не беспокоить» не требуется.</string>
 
-    <string name="pref_title_start_maps_in_background">Start Google Maps in background</string>
-    <string name="pref_description_start_maps_in_background">Start Google Maps navigation when
-        you start the app
-    </string>
+    <string name="pref_title_start_maps_in_background">Запускать Google Карты</string>
+    <string name="pref_description_start_maps_in_background">Открывать навигацию Google Карт при запуске приложения</string>
 
-    <string name="pref_delete_recordings">Delete all recordings</string>
-    <string name="pref_description_delete_recordings">Delete all recordings created by Open Dash
-        Cam
-    </string>
-    <string name="pref_delete_recordings_confirmation">All recordings deleted</string>
-    <string name="title_activity_welcome">WelcomeActivity</string>
+    <string name="pref_delete_recordings">Удалить все записи</string>
+    <string name="pref_description_delete_recordings">Удалить все видео и аудио, созданные Open Dash Cam</string>
+    <string name="pref_delete_recordings_confirmation">Все записи удалены</string>
 
-    <string name="recordings_list_empty_message_title">No video recordings yet</string>
-    <string name="recordings_list_empty_message">New videos get recorded continuously every 45 seconds, so you should see one here soon.</string>
+    <string name="recordings_list_empty_message_title">Записей пока нет</string>
+    <string name="recordings_list_empty_message">Новые записи появляются по мере работы — скоро здесь будет первая.</string>
 
-    <string name="notification_title">Open Dash Cam recording</string>
-    <string name="notification_text">Video recording in progress</string>
+    <string name="notification_title">Open Dash Cam — запись</string>
+    <string name="notification_text">Идёт видеозапись</string>
+    <string name="notification_title_audio">Open Dash Cam — диктофон</string>
+    <string name="notification_text_audio">Идёт аудиозапись (MP3)</string>
+    <string name="notification_title_audio_marker">Open Dash Cam — аудио с метками</string>
+    <string name="notification_text_audio_marker">Идёт запись аудио с GPS-метками</string>
+    <string name="notification_channel_name">Open Dash Cam</string>
+
+    <string name="pref_category_storage">Хранилище</string>
+    <string name="pref_category_recording">Запись</string>
+    <string name="pref_category_security">Безопасность</string>
+    <string name="pref_category_general">Общие</string>
+    <string name="pref_title_app_mode">Режим работы</string>
+    <string name="pref_summary_app_mode_default">Видеорегистратор</string>
+    <string name="pref_title_video_record_audio">Записывать звук в видео</string>
+    <string name="pref_description_video_record_audio">Включить микрофон при видеозаписи</string>
+
+    <string name="pref_title_segment_duration">Длительность одного файла</string>
+    <string name="pref_summary_segment_duration">%1$d мин на файл</string>
+    <string name="pref_summary_segment_duration_hours">%1$d ч на файл</string>
+    <string name="pref_summary_segment_duration_default">1 мин на файл</string>
+
+    <string name="pref_title_video_resolution">Разрешение видео</string>
+    <string name="pref_summary_video_resolution_default">720p (HD)</string>
+    <string name="pref_title_video_orientation">Ориентация записи</string>
+    <string name="pref_summary_video_orientation_default">Автоматический</string>
+    <string name="pref_description_video_orientation">Альбомный — широкий кадр, планшетный — вертикальный. Водяные знаки всегда на длинной стороне кадра.</string>
+
+    <string name="pref_title_storage_quota">Максимальный объём записей</string>
+    <string name="pref_summary_storage_quota_default">По доступному месту</string>
+    <string name="pref_storage_quota_max">Максимум (%1$s)</string>
+    <string name="pref_storage_size_mb">%1$d МБ</string>
+    <string name="pref_storage_size_gb">%1$d ГБ</string>
+
+    <string name="pref_title_cyclic_recording">Циклическая запись</string>
+    <string name="pref_description_cyclic_recording">Удалять старые файлы при достижении лимита объёма (кроме отмеченных звёздочкой)</string>
+    <string name="error_storage_quota_full">Достигнут лимит объёма записей. Освободите место или включите циклическую запись.</string>
+
+    <string name="pref_title_recordings_folder">Папка для записей</string>
+    <string name="pref_recordings_folder_default">Папки Video и Audio в каталоге приложения</string>
+    <string name="pref_recordings_folder_custom">Выбранная папка</string>
+    <string name="pref_title_reset_recordings_folder">Папка по умолчанию</string>
+    <string name="pref_description_reset_recordings_folder">Сохранять новые записи в стандартную папку приложения</string>
+
+    <string name="pref_title_setup_pin">Установить PIN-код</string>
+    <string name="pref_description_setup_pin">Создать или изменить PIN (4–8 цифр)</string>
+    <string name="pref_title_pin_enabled">Защита PIN-кодом</string>
+    <string name="pref_description_pin_enabled">Запрашивать PIN для выбранных действий</string>
+    <string name="pref_title_pin_app_start">PIN при запуске</string>
+    <string name="pref_description_pin_app_start">Запрашивать PIN при запуске регистратора</string>
+    <string name="pref_title_pin_stop">PIN для остановки</string>
+    <string name="pref_description_pin_stop">Запрашивать PIN при остановке записи из виджета</string>
+    <string name="pref_title_pin_delete">PIN для удаления</string>
+    <string name="pref_description_pin_delete">Запрашивать PIN перед удалением всех записей</string>
+
+    <string name="pin_enter_title">Введите PIN</string>
+    <string name="pin_enter_message">Введите PIN-код для продолжения</string>
+    <string name="pin_setup_title">Установка PIN</string>
+    <string name="pin_setup_message">Придумайте PIN из 4–8 цифр</string>
+    <string name="pin_hint">PIN-код</string>
+    <string name="pin_confirm_hint">Подтвердите PIN</string>
+    <string name="pin_ok">OK</string>
+    <string name="pin_cancel">Отмена</string>
+    <string name="pin_too_short">PIN должен содержать минимум 4 цифры</string>
+    <string name="pin_mismatch">PIN-коды не совпадают</string>
+    <string name="pin_invalid">Неверный PIN</string>
+    <string name="pin_setup_success">PIN сохранён</string>
+    <string name="pin_message_stop">Введите PIN для остановки записи</string>
+    <string name="pin_message_delete">Введите PIN для удаления всех записей</string>
+
+    <string name="watermark_gps_unavailable">GPS: нет данных</string>
+
+    <!-- Разрешения и ошибки -->
+    <string name="error_storage_not_enough">Недостаточно места (нужно %1$d МБ). Освободите память для записей.</string>
+    <string name="permission_overlay_needed">Нужно разрешение «Поверх других приложений»</string>
+    <string name="permission_overlay_back">Разрешите и нажмите «Назад»</string>
+    <string name="permission_overlay_restart">Затем снова запустите Open Dash Cam</string>
+    <string name="permission_denied">Разрешения не предоставлены. Приложение не может запуститься.</string>
+    <string name="permission_denied_restart">Перезапустите Open Dash Cam и выдайте все запрошенные разрешения.</string>
+    <string name="permission_location_rationale">Нужен доступ к геолокации для GPS-координат и адреса на видео.</string>
+    <string name="permission_location_optional_denied">Геолокация не разрешена — запись начнётся без GPS-меток.</string>
+    <string name="error_service_start_failed">Не удалось запустить фоновую запись. Проверьте разрешения микрофона.</string>
+    <string name="warning_low_quota">ВНИМАНИЕ: мало места в квоте.\nСнимите звёздочки с записей, чтобы освободить место.</string>
+    <string name="recording_fallback_name">Запись %1$d</string>
+    <string name="cannot_open_file">Не удалось открыть файл</string>
 </resources>

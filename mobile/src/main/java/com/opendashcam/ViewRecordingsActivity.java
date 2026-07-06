@@ -2,10 +2,11 @@ package com.opendashcam;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.view.View;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.opendashcam.models.Recording;
 import com.opendashcam.presenters.IViewRecordings;
@@ -13,61 +14,59 @@ import com.opendashcam.presenters.ViewRecordingsPresenter;
 
 import java.util.ArrayList;
 
-/**
- * Activity to view video recordings produced by this dash cam application
- * Displays all videos from paths matching %OpenDashCam%
- */
-
 public class ViewRecordingsActivity extends AppCompatActivity implements IViewRecordings.View {
 
-    private RecyclerView mRecyclerView;
-    private ViewRecordingsRecyclerViewAdapter mAdapter;
-    private View mLayoutListEmpty;
-
-    private IViewRecordings.Presenter mPresenter;
+    private final OverlayLifecycle overlayLifecycle = new OverlayLifecycle();
+    private RecyclerView recyclerView;
+    private ViewRecordingsRecyclerViewAdapter adapter;
+    private View layoutListEmpty;
+    private IViewRecordings.Presenter presenter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        RecordingOrientationHelper.applyActivityOrientation(this);
         super.onCreate(savedInstanceState);
+        overlayLifecycle.onCreate(this);
         setContentView(R.layout.activity_view_recordings);
-
+        presenter = new ViewRecordingsPresenter(this);
         initRecyclerView();
-
-        mPresenter = new ViewRecordingsPresenter(this);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        mPresenter.onStartView();
+        presenter.onStartView();
     }
 
     @Override
     protected void onStop() {
-        mPresenter.onStopView();
+        presenter.onStopView();
         super.onStop();
     }
 
     @Override
+    protected void onDestroy() {
+        overlayLifecycle.onDestroy(this);
+        super.onDestroy();
+    }
+
+    @Override
     public void updateRecordingsList(ArrayList<Recording> recordingsList) {
-        if (mRecyclerView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) return;
-
-        if (mAdapter != null) {
-            mAdapter.populateList(recordingsList);
+        if (recyclerView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
+            return;
         }
 
-        if (mRecyclerView != null && mLayoutListEmpty != null) {
-            if (recordingsList == null || recordingsList.isEmpty()) {
-                //show message "no video recordings yet ..."
-                mRecyclerView.setVisibility(View.GONE);
-                mLayoutListEmpty.setVisibility(View.VISIBLE);
-            } else {
-                //show non-empty videos list
-                mRecyclerView.setVisibility(View.VISIBLE);
-                mLayoutListEmpty.setVisibility(View.GONE);
-            }
+        if (adapter != null) {
+            adapter.populateList(recordingsList);
         }
 
+        if (recordingsList == null || recordingsList.isEmpty()) {
+            recyclerView.setVisibility(View.GONE);
+            layoutListEmpty.setVisibility(View.VISIBLE);
+        } else {
+            recyclerView.setVisibility(View.VISIBLE);
+            layoutListEmpty.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -75,24 +74,15 @@ public class ViewRecordingsActivity extends AppCompatActivity implements IViewRe
         return this;
     }
 
-    /**
-     * Set recycler view for gallery
-     */
     private void initRecyclerView() {
-        mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        mLayoutListEmpty = findViewById(R.id.layout_list_empty);
+        recyclerView = findViewById(R.id.recycler_view);
+        layoutListEmpty = findViewById(R.id.layout_list_empty);
 
-        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(this);
-        mRecyclerView.setLayoutManager(layoutManager);
-
-        mAdapter = new ViewRecordingsRecyclerViewAdapter(
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new ViewRecordingsRecyclerViewAdapter(
                 this,
-                new ViewRecordingsRecyclerViewAdapter.RecordingListener() {
-                    @Override
-                    public void onItemClick(Recording recording) {
-                        mPresenter.onRecordingsItemPressed(recording);
-                    }
-                });
-        mRecyclerView.setAdapter(mAdapter);
+                recording -> presenter.onRecordingsItemPressed(recording)
+        );
+        recyclerView.setAdapter(adapter);
     }
 }

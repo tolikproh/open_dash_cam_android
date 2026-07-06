@@ -6,47 +6,38 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Handler;
-import android.support.v4.content.FileProvider;
-import android.support.v4.content.LocalBroadcastManager;
+import android.os.Looper;
 import android.util.Log;
+
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.opendashcam.DBHelper;
 import com.opendashcam.OpenDashApp;
+import com.opendashcam.RecordingCatalog;
+import com.opendashcam.RecordingMediaType;
+import com.opendashcam.StorageHelper;
 import com.opendashcam.Util;
 import com.opendashcam.models.Recording;
 
-import java.io.File;
 import java.util.ArrayList;
-
-/**
- * Presenter for recordings screen
- * <p>
- * <p>
- * Created by Dmitriy V. Chernysh on 15.11.17.
- * <p>
- * https://fb.me/mobiledevpro/
- * https://github.com/dmitriy-chernysh
- * #MobileDevPro
- */
 
 public class ViewRecordingsPresenter implements IViewRecordings.Presenter {
 
-    private static final String LOG_TAG_DEBUG = ViewRecordingsPresenter.class.getSimpleName();
+    private static final String LOG_TAG = ViewRecordingsPresenter.class.getSimpleName();
 
-    private IViewRecordings.View mView;
-    private Handler mUpdateListHandler = new Handler();
-    private BroadcastReceiver mBroadcastReceiver;
+    private final IViewRecordings.View view;
+    private Handler updateListHandler;
+    private BroadcastReceiver broadcastReceiver;
 
     public ViewRecordingsPresenter(IViewRecordings.View view) {
-        mView = view;
+        this.view = view;
     }
 
     @Override
     public void onStartView() {
-        mView.updateRecordingsList(
-                getDataSet()
-        );
-        //receive broadcasts when videos list are changed in sqlite
+        updateListHandler = new Handler(Looper.getMainLooper());
+        RecordingCatalog.syncFromStorage(view.getActivity());
+        view.updateRecordingsList(getDataSet());
         registerBroadcastReceiver();
     }
 
@@ -58,65 +49,55 @@ public class ViewRecordingsPresenter implements IViewRecordings.Presenter {
 
     @Override
     public void onRecordingsItemPressed(Recording recordingItem) {
-        if (recordingItem == null) return;
-        // Play recording on position
-        Util.showToast(mView.getActivity(), recordingItem.getDateSaved() +
-                " - " +
-                recordingItem.getTimeSaved());
+        if (recordingItem == null) {
+            return;
+        }
 
-        Uri fileUri = FileProvider.getUriForFile(
-                mView.getActivity(),
-                OpenDashApp.getAppContext()
-                        .getApplicationContext()
-                        .getPackageName() + ".provider", new File(recordingItem.getFilePath()));
+        Util.showToast(
+                view.getActivity(),
+                recordingItem.getDateSaved() + " - " + recordingItem.getTimeSaved()
+        );
 
-        Util.openFile(
-                mView.getActivity(),
-                fileUri,
-                "video/mp4");
+        Uri fileUri = StorageHelper.toContentUri(
+                view.getActivity(),
+                recordingItem.getFilePath()
+        );
+
+        Util.openFile(view.getActivity(), fileUri, RecordingMediaType.fromPath(recordingItem.getFilePath()).getMimeType());
     }
 
     private void stopUpdateList() {
-        if (mUpdateListHandler != null) {
-            mUpdateListHandler.removeCallbacksAndMessages(this);
-            mUpdateListHandler = null;
+        if (updateListHandler != null) {
+            updateListHandler.removeCallbacksAndMessages(null);
+            updateListHandler = null;
         }
     }
 
-    /**
-     * Populates array with Recording objects
-     *
-     * @return ArrayList<Recording>
-     */
     private ArrayList<Recording> getDataSet() {
         return DBHelper.getInstance(OpenDashApp.getAppContext()).selectAllRecordingsList();
     }
 
     private void registerBroadcastReceiver() {
-        mBroadcastReceiver = new BroadcastReceiver() {
+        broadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 String action = intent != null ? intent.getAction() : null;
-
-                //update recordings list when video has been recorded
-                if (action != null && action.equals(Util.ACTION_UPDATE_RECORDINGS_LIST)) {
-                    mView.updateRecordingsList(
-                            getDataSet()
-                    );
-                    Log.d(LOG_TAG_DEBUG, "ViewRecordingsPresenter.onReceive(): update recordings list");
+                if (Util.ACTION_UPDATE_RECORDINGS_LIST.equals(action)) {
+                    view.updateRecordingsList(getDataSet());
+                    Log.d(LOG_TAG, "Recordings list updated");
                 }
             }
         };
-        LocalBroadcastManager.getInstance(mView.getActivity()).registerReceiver(
-                mBroadcastReceiver,
+        LocalBroadcastManager.getInstance(view.getActivity()).registerReceiver(
+                broadcastReceiver,
                 new IntentFilter(Util.ACTION_UPDATE_RECORDINGS_LIST)
         );
     }
 
     private void unRegisterBroadcastReceiver() {
-        if (mBroadcastReceiver != null) {
-            LocalBroadcastManager.getInstance(mView.getActivity()).unregisterReceiver(mBroadcastReceiver);
-            mBroadcastReceiver = null;
+        if (broadcastReceiver != null) {
+            LocalBroadcastManager.getInstance(view.getActivity()).unregisterReceiver(broadcastReceiver);
+            broadcastReceiver = null;
         }
     }
 }

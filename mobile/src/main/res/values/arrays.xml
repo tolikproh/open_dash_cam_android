@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pref_app_mode_entries">
+        <item>Видеорегистратор</item>
+        <item>Диктофон</item>
+        <item>Аудио с метками</item>
+    </string-array>
+    <string-array name="pref_app_mode_values">
+        <item>video</item>
+        <item>audio</item>
+        <item>audio_marker</item>
+    </string-array>
+
+    <string-array name="pref_segment_duration_entries">
+        <item>1 мин</item>
+        <item>2 мин</item>
+        <item>3 мин</item>
+        <item>4 мин</item>
+        <item>5 мин</item>
+        <item>10 мин</item>
+        <item>15 мин</item>
+        <item>20 мин</item>
+        <item>30 мин</item>
+        <item>45 мин</item>
+        <item>1 ч</item>
+    </string-array>
+    <string-array name="pref_segment_duration_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>10</item>
+        <item>15</item>
+        <item>20</item>
+        <item>30</item>
+        <item>45</item>
+        <item>60</item>
+    </string-array>
+
+    <string-array name="pref_video_resolution_entries">
+        <item>480p (SD)</item>
+        <item>720p (HD)</item>
+        <item>1080p (Full HD)</item>
+        <item>4K (Ultra HD)</item>
+    </string-array>
+    <string-array name="pref_video_resolution_values">
+        <item>480</item>
+        <item>720</item>
+        <item>1080</item>
+        <item>2160</item>
+    </string-array>
+
+    <string-array name="pref_video_orientation_entries">
+        <item>Автоматический</item>
+        <item>Альбомный</item>
+        <item>Планшетный</item>
+    </string-array>
+    <string-array name="pref_video_orientation_values">
+        <item>auto</item>
+        <item>landscape</item>
+        <item>portrait</item>
+    </string-array>
+</resources>

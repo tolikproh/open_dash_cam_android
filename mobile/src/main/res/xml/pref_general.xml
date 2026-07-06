@@ -1,27 +1,119 @@
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
-    <!--
-    <SwitchPreference
-        android:defaultValue="false"
-        android:key="rotate"
-        android:summary="@string/pref_description_rotate"
-        android:title="@string/pref_title_rotate" />
-    -->
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <SwitchPreference
-        android:defaultValue="true"
-        android:key="disable_sound"
-        android:summary="@string/pref_description_silent"
-        android:title="@string/pref_title_silent" />
+    <PreferenceCategory android:title="@string/pref_category_recording">
+        <ListPreference
+            android:defaultValue="video"
+            android:entries="@array/pref_app_mode_entries"
+            android:entryValues="@array/pref_app_mode_values"
+            android:key="app_mode"
+            android:summary="@string/pref_summary_app_mode_default"
+            android:title="@string/pref_title_app_mode" />
 
-    <SwitchPreference
-        android:defaultValue="true"
-        android:key="start_maps_in_background"
-        android:summary="@string/pref_description_start_maps_in_background"
-        android:title="@string/pref_title_start_maps_in_background" />
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="video_record_audio"
+            android:summary="@string/pref_description_video_record_audio"
+            android:title="@string/pref_title_video_record_audio" />
 
-    <Preference
-        android:key="delete_recordings"
-        android:summary="@string/pref_description_delete_recordings"
-        android:title="@string/pref_delete_recordings" />
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/pref_segment_duration_entries"
+            android:entryValues="@array/pref_segment_duration_values"
+            android:key="segment_duration_minutes"
+            android:summary="@string/pref_summary_segment_duration_default"
+            android:title="@string/pref_title_segment_duration" />
+
+        <ListPreference
+            android:defaultValue="720"
+            android:entries="@array/pref_video_resolution_entries"
+            android:entryValues="@array/pref_video_resolution_values"
+            android:key="video_resolution"
+            android:summary="@string/pref_summary_video_resolution_default"
+            android:title="@string/pref_title_video_resolution" />
+
+        <ListPreference
+            android:defaultValue="auto"
+            android:entries="@array/pref_video_orientation_entries"
+            android:entryValues="@array/pref_video_orientation_values"
+            android:key="video_orientation"
+            android:summary="@string/pref_summary_video_orientation_default"
+            android:title="@string/pref_title_video_orientation" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_storage">
+        <ListPreference
+            android:defaultValue="max"
+            android:key="storage_quota_mb"
+            android:summary="@string/pref_summary_storage_quota_default"
+            android:title="@string/pref_title_storage_quota" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="cyclic_recording"
+            android:summary="@string/pref_description_cyclic_recording"
+            android:title="@string/pref_title_cyclic_recording" />
+
+        <Preference
+            android:key="choose_recordings_folder"
+            android:summary="@string/pref_recordings_folder_default"
+            android:title="@string/pref_title_recordings_folder" />
+
+        <Preference
+            android:key="reset_recordings_folder"
+            android:summary="@string/pref_description_reset_recordings_folder"
+            android:title="@string/pref_title_reset_recordings_folder" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_security">
+        <Preference
+            android:key="setup_pin"
+            android:summary="@string/pref_description_setup_pin"
+            android:title="@string/pref_title_setup_pin" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="pin_enabled"
+            android:summary="@string/pref_description_pin_enabled"
+            android:title="@string/pref_title_pin_enabled" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="pin_require_app_start"
+            android:summary="@string/pref_description_pin_app_start"
+            android:title="@string/pref_title_pin_app_start" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="pin_require_stop"
+            android:summary="@string/pref_description_pin_stop"
+            android:title="@string/pref_title_pin_stop" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="pin_require_delete"
+            android:summary="@string/pref_description_pin_delete"
+            android:title="@string/pref_title_pin_delete" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_general">
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="disable_sound"
+            android:summary="@string/pref_description_silent"
+            android:title="@string/pref_title_silent" />
+
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="start_maps_in_background"
+            android:summary="@string/pref_description_start_maps_in_background"
+            android:title="@string/pref_title_start_maps_in_background" />
+
+        <Preference
+            android:key="delete_recordings"
+            android:summary="@string/pref_description_delete_recordings"
+            android:title="@string/pref_delete_recordings" />
+    </PreferenceCategory>
 
 </PreferenceScreen>

@@ -13,7 +13,7 @@
         android:id="@+id/section_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Let's get started"
+        android:text="@string/welcome_get_started"
         android:textAppearance="@android:style/TextAppearance.Material.Title"
         android:textSize="30sp"
         android:layout_marginBottom="10dp"
@@ -46,7 +46,7 @@
         android:id="@+id/textView4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Swipe left to continue"
+        android:text="@string/welcome_swipe_left"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true" />
 

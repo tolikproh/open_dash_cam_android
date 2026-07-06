@@ -1,14 +1,18 @@
 package com.opendashcam.models;
 
+import android.net.Uri;
 import android.text.TextUtils;
 
 import com.opendashcam.DBHelper;
 import com.opendashcam.OpenDashApp;
+import com.opendashcam.R;
+import com.opendashcam.StorageHelper;
 import com.opendashcam.Util;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * Model class for video recording
@@ -22,8 +26,9 @@ public class Recording {
     private String timeSaved;
     private DBHelper dbHelper;
 
-    private static SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE MMM d");
-    private static SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss");
+    private static final Locale RU_LOCALE = Locale.forLanguageTag("ru");
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("d MMMM yyyy", RU_LOCALE);
+    private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss", RU_LOCALE);
 
     /**
      * Constructor for selecting rows from SQLite
@@ -35,7 +40,12 @@ public class Recording {
         dbHelper = DBHelper.getInstance(OpenDashApp.getAppContext());
         this.id = id;
         this.filePath = filePath;
-        this.filename = new File(filePath).getName();
+        if (filePath != null && filePath.startsWith("content://")) {
+            String segment = Uri.parse(filePath).getLastPathSegment();
+            this.filename = segment != null ? segment : "recording.mp4";
+        } else {
+            this.filename = new File(filePath).getName();
+        }
         getDatesFromFile();
     }
 
@@ -83,12 +93,12 @@ public class Recording {
 
     private void getDatesFromFile() {
         if (filePath != null && !filePath.isEmpty()) {
-            File file = new File(filePath);
-            Date lastModDate = new Date(file.lastModified());
+            long lastModified = StorageHelper.getRecordingLastModified(OpenDashApp.getAppContext(), filePath);
+            Date lastModDate = new Date(lastModified);
             dateSaved = DATE_FORMAT.format(lastModDate);
             timeSaved = TIME_FORMAT.format(lastModDate);
         } else {
-            dateSaved = "Video " + id;
+            dateSaved = OpenDashApp.getAppContext().getString(R.string.recording_fallback_name, id);
             timeSaved = "";
         }
     }

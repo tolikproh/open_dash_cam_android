@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.provider.BaseColumns;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.opendashcam.models.Recording;
@@ -197,31 +198,29 @@ class DBRecordingsContract {
      * @return True - exists
      */
     static boolean isRecordingExists(SQLiteDatabase db, Recording recording) {
-        if (recording == null) return false;
-        Cursor cursor;
-        int rowCount = 0;
-
-        cursor = db.query(
+        if (recording == null || TextUtils.isEmpty(recording.getFilePath())) {
+            return false;
+        }
+        Cursor cursor = db.query(
                 RecordingsTable.TABLE_NAME,
                 new String[]{RecordingsTable._ID},
-                "CAST (" + RecordingsTable._ID + " AS TEXT) = ?",
-                new String[]{String.valueOf(recording.getId())},
+                RecordingsTable.COLUMN_FILE_PATH + " = ?",
+                new String[]{recording.getFilePath()},
                 null,
                 null,
                 null,
                 null
         );
-
         try {
-            rowCount = cursor.getCount();
+            return cursor.getCount() > 0;
         } catch (Exception e) {
             Log.e(DBRecordingsContract.class.getSimpleName(), "isRecordingExists: EXCEPTION - " + e.getMessage(), e);
+            return false;
         } finally {
             if (cursor != null && !cursor.isClosed()) {
                 cursor.close();
             }
         }
-        return rowCount > 0;
     }
 
     /**

@@ -5,7 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
-import android.os.Build;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,16 +14,12 @@ import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
 
 import com.opendashcam.BackgroundVideoRecorder;
+import com.opendashcam.PinManager;
 import com.opendashcam.R;
 import com.opendashcam.SettingsActivity;
 import com.opendashcam.Util;
 import com.opendashcam.ViewRecordingsActivity;
-
-import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-
-/**
- * Abstract class for all specific rootView classes to extend from
- */
+import com.opendashcam.models.Recording;
 
 public class Widget {
     protected Service service;
@@ -34,6 +30,7 @@ public class Widget {
     private int gravity = Gravity.CENTER_VERTICAL | Gravity.START;
     private int x = 0;
     private int y = 0;
+    private boolean isShown = false;
 
     public Widget(Service service, WindowManager windowManager) {
         this.service = service;
@@ -47,47 +44,43 @@ public class Widget {
         this.y = y;
     }
 
-    /**
-     * Displays the rootView on screen
-     */
     public void show() {
-        int type = WindowManager.LayoutParams.TYPE_PHONE;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        if (isShown && viewHolder.rootView.getParent() != null) {
+            return;
+        }
+        isShown = false;
+
+        int type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 
         layoutParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
+                PixelFormat.TRANSLUCENT
+        );
 
-//        rootView.setImageResource(widgetDrawableResource);
-
-        // Set position on screen
         layoutParams.gravity = this.gravity;
         layoutParams.x = this.x;
         layoutParams.y = this.y;
 
         windowManager.addView(viewHolder.rootViewMenu, layoutParams);
         windowManager.addView(viewHolder.rootView, layoutParams);
+        isShown = true;
     }
 
-    /**
-     * Removes the rootView from screen
-     */
     public void hide() {
-        //widget for "rec" button
+        if (!isShown) {
+            return;
+        }
         windowManager.removeView(viewHolder.rootView);
-        //widget for menu
         windowManager.removeView(viewHolder.rootViewMenu);
+        isShown = false;
     }
 
-    /**
-     * Toggles the visibility of the rootView on screen
-     */
-    public void toggle() {
-        viewHolder.toggleSecondaryWidgets();
+    private void startActivityHidingOverlay(Intent intent) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        service.startActivity(intent);
     }
 
     private class WidgetViewHolder implements View.OnClickListener {
@@ -102,7 +95,6 @@ public class Widget {
         boolean areSecondaryWidgetsShown = false;
 
         WidgetViewHolder(Context context) {
-
             rootView = LayoutInflater.from(context).inflate(R.layout.layout_widgets, null);
             recView = rootView.findViewById(R.id.rec_button);
 
@@ -124,60 +116,46 @@ public class Widget {
         @Override
         public void onClick(View v) {
             int id = v.getId();
-            switch (id) {
-                case R.id.view_recordings_button:
-                    Intent viewRecordingsIntent = new Intent(service, ViewRecordingsActivity.class);
-                    viewRecordingsIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
-                    service.startActivity(viewRecordingsIntent);
-                    hideSecondaryWidgets();
-                    break;
-                case R.id.save_recording_button:
-                    // Access shared references file
-                    SharedPreferences sharedPref = service.getApplicationContext().getSharedPreferences(
-                            service.getString(R.string.current_recordings_preferences_key),
-                            Context.MODE_PRIVATE);
+            if (id == R.id.view_recordings_button) {
+                startActivityHidingOverlay(new Intent(service, ViewRecordingsActivity.class));
+                hideSecondaryWidgets();
+            } else if (id == R.id.save_recording_button) {
+                SharedPreferences sharedPref = service.getApplicationContext().getSharedPreferences(
+                        service.getString(R.string.current_recordings_preferences_key),
+                        Context.MODE_PRIVATE
+                );
 
-                    // Save video that is being recorded now
-                    String currentVideoRecording = sharedPref.
-                            getString(service.getString(R.string.current_recording_preferences_key),
-                                    "null");
+                String currentVideoRecording = sharedPref.getString(
+                        service.getString(R.string.current_recording_preferences_key),
+                        "null"
+                );
+                if (!TextUtils.isEmpty(currentVideoRecording) && !"null".equals(currentVideoRecording)) {
+                    new Recording(currentVideoRecording).toggleStar(true);
+                }
 
-                    if (currentVideoRecording != "null") {
-                        // star current recording
-                        Recording recording = new Recording(currentVideoRecording);
-                        recording.toggleStar(true);
-                    }
+                String previousVideoRecording = sharedPref.getString(
+                        service.getString(R.string.previous_recording_preferences_key),
+                        "null"
+                );
+                if (!TextUtils.isEmpty(previousVideoRecording) && !"null".equals(previousVideoRecording)) {
+                    new Recording(0, previousVideoRecording).toggleStar(true);
+                }
 
-                    // Save the oldest (previous) recording
-                    String previousVideoRecording = sharedPref.
-                            getString(service.getString(R.string.previous_recording_preferences_key),
-                                    "null");
-
-                    if (previousVideoRecording != "null") {
-                        // star previous recording
-                        Recording recording = new Recording( 0, previousVideoRecording);
-                        recording.toggleStar(true);
-                    }
-
-                    // Show success message
-                    Util.showToastLong(service, service.getString(R.string.save_recording_success_msg));
-                    break;
-                case R.id.rec_button:
-                    toggleSecondaryWidgets();
-                    break;
-                case R.id.settings_button:
-                    Intent settingsIntent = new Intent(service, SettingsActivity.class);
-                    settingsIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
-                    service.startActivity(settingsIntent);
-                    // hide secondary widgets
-                    hideSecondaryWidgets();
-                    break;
-                case R.id.stop_and_quit_button:
-                    // Stop video recording service
+                Util.showToastLong(service, service.getString(R.string.save_recording_success_msg));
+            } else if (id == R.id.rec_button) {
+                toggleSecondaryWidgets();
+            } else if (id == R.id.settings_button) {
+                startActivityHidingOverlay(new Intent(service, SettingsActivity.class));
+                hideSecondaryWidgets();
+            } else if (id == R.id.stop_and_quit_button) {
+                if (PinManager.isRequiredFor(service, PinManager.ACTION_STOP_RECORDING)) {
+                    startActivityHidingOverlay(
+                            PinManager.createVerifyIntent(service, PinManager.ACTION_STOP_RECORDING)
+                    );
+                } else {
                     service.stopService(new Intent(service, BackgroundVideoRecorder.class));
-                    // Stop the rootView service
                     service.stopSelf();
-                    break;
+                }
             }
         }
 
@@ -192,7 +170,6 @@ public class Widget {
         private void showSecondaryWidgets() {
             rootViewMenu.setVisibility(View.VISIBLE);
 
-            //show menu layout with animation
             Animation animation = new ScaleAnimation(
                     0f, 1f,
                     0f, 1f,
@@ -207,20 +184,17 @@ public class Widget {
         }
 
         private void hideSecondaryWidgets() {
-            //hide menu layout with animation
             Animation animation = new ScaleAnimation(
                     1f, 0f,
                     1f, 0f,
                     Animation.RELATIVE_TO_SELF, 0f,
                     Animation.RELATIVE_TO_SELF, 0.5f
             );
-            //on the first start no need to show animation, set 0
             animation.setDuration(areSecondaryWidgetsShown ? 200 : 0);
             animation.setFillAfter(true);
             animation.setAnimationListener(new Animation.AnimationListener() {
                 @Override
                 public void onAnimationStart(Animation animation) {
-                    //do nothing
                 }
 
                 @Override
@@ -230,7 +204,6 @@ public class Widget {
 
                 @Override
                 public void onAnimationRepeat(Animation animation) {
-                    //do nothing
                 }
             });
             layoutMenu.startAnimation(animation);
