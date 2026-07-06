@@ -11,3 +11,7 @@
 *.properties
 !gradle-wrapper.properties
 !gradle.properties
+!keystore.properties.example
+*.jks
+*.keystore
+release.keystore
