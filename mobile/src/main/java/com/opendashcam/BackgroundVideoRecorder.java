@@ -51,6 +51,8 @@ public class BackgroundVideoRecorder extends LifecycleService {
     private SurfaceTexture previewSurfaceTexture;
     private Surface previewSurface;
     private RecordingLocationTracker locationTracker;
+    /** Captured before the tracker is released so late Finalize/watermark still get GPS. */
+    private RecordingLocationSnapshot pendingStopLocationSnapshot;
     private RecordingOrientationHelper.DeviceOrientationTracker deviceOrientationTracker;
     private int appliedTargetRotation = -1;
     private Recorder recorder;
@@ -187,6 +189,20 @@ public class BackgroundVideoRecorder extends LifecycleService {
         locationTracker.start();
     }
 
+    private RecordingLocationSnapshot captureLocationSnapshot() {
+        if (pendingStopLocationSnapshot != null) {
+            return pendingStopLocationSnapshot;
+        }
+        return RecordingLocationSnapshot.from(locationTracker);
+    }
+
+    private void releaseLocationTracker() {
+        if (locationTracker != null) {
+            locationTracker.release();
+            locationTracker = null;
+        }
+    }
+
     private void releaseVideoPipeline() {
         if (activeVideoRecording != null) {
             activeVideoRecording.stop();
@@ -208,20 +224,16 @@ public class BackgroundVideoRecorder extends LifecycleService {
             previewSurfaceTexture = null;
         }
 
-        if (locationTracker != null) {
-            locationTracker.release();
-            locationTracker = null;
-        }
-
         if (deviceOrientationTracker != null) {
             deviceOrientationTracker.stop();
             deviceOrientationTracker = null;
         }
 
-        preview = null;
-        recorder = null;
         videoCapture = null;
+        recorder = null;
+        preview = null;
         videoPipelineReady = false;
+        appliedTargetRotation = -1;
     }
 
     private void ensureVideoPipelineReady() {
@@ -315,6 +327,9 @@ public class BackgroundVideoRecorder extends LifecycleService {
         }
         if (cameraProvider != null) {
             releaseVideoPipeline();
+        }
+        if (RecordingPreferences.usesLocation(this)) {
+            ensureLocationTrackerStarted();
         }
 
         Context context = getApplicationContext();
@@ -577,7 +592,7 @@ public class BackgroundVideoRecorder extends LifecycleService {
 
     private void processCompletedAudioMarkerSegment(File recordedFile, long segmentStartMs) {
         Context appContext = getApplicationContext();
-        RecordingLocationSnapshot locationSnapshot = RecordingLocationSnapshot.from(locationTracker);
+        RecordingLocationSnapshot locationSnapshot = captureLocationSnapshot();
 
         RecordingPostProcessor.execute(appContext, () -> {
             File outputFile = recordedFile;
@@ -660,14 +675,17 @@ public class BackgroundVideoRecorder extends LifecycleService {
             return;
         }
 
+        RecordingLocationSnapshot locationSnapshot = captureLocationSnapshot();
+
         Runnable watermarkTask = () -> {
             File outputFile = recordedFile;
             try {
                 outputFile = VideoWatermarkBurner.burn(
                         getApplicationContext(),
                         recordedFile,
-                        locationTracker,
-                        segmentStartMs
+                        locationSnapshot,
+                        segmentStartMs,
+                        RecordingMediaType.VIDEO
                 );
             } catch (Throwable t) {
                 Log.e(TAG, "Watermark processing failed", t);
@@ -720,6 +738,10 @@ public class BackgroundVideoRecorder extends LifecycleService {
         segmentHandler.removeCallbacks(prePrepareRunnable);
         discardPreparedNextSegment();
 
+        // Freeze GPS/address before stopping capture or releasing the tracker.
+        // CameraX Finalize and audio-marker post-process may run after this.
+        pendingStopLocationSnapshot = RecordingLocationSnapshot.from(locationTracker);
+
         if (audioMp3Recorder != null) {
             if (RecordingPreferences.isAudioMarkerMode(this)) {
                 finishCurrentAudioMarkerSegment();
@@ -731,6 +753,7 @@ public class BackgroundVideoRecorder extends LifecycleService {
         StorageHelper.clearActiveRecordingPaths(this);
 
         releaseVideoPipeline();
+        releaseLocationTracker();
 
         cameraExecutor.shutdown();
         handlerThread.quitSafely();

@@ -7,6 +7,8 @@ APK_DEBUG := mobile/build/outputs/apk/debug/mobile-debug.apk
 APK_RELEASE := mobile/build/outputs/apk/release/mobile-release.apk
 KEYSTORE := release.keystore
 KEYSTORE_PROPS := keystore.properties
+PACKAGE := com.opendashcam
+ADB ?= $(ANDROID_SDK)/platform-tools/adb
 
 VERSION := $(shell grep 'versionName' mobile/build.gradle | sed -n "s/.*versionName ['\"]\([^'\"]*\)['\"].*/\1/p" | head -1)
 TAG := v$(VERSION)
@@ -15,19 +17,20 @@ GITHUB_NOTES ?= Release $(VERSION)
 GITHUB_REPO ?= $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*github.com[:/]([^/]+/[^/.]+).*|\1|')
 GH := gh --repo $(GITHUB_REPO)
 
-.PHONY: all setup keystore debug release install publish clean help
+.PHONY: all setup keystore debug release install install-release publish clean help
 
 all: debug
 
 help:
 	@echo "Open Dash Cam — цели сборки:"
-	@echo "  make setup    — local.properties и права на gradlew"
-	@echo "  make keystore — создать release.keystore для подписи APK"
-	@echo "  make debug    — debug APK ($(APK_DEBUG))"
-	@echo "  make release  — release APK ($(APK_RELEASE))"
-	@echo "  make publish  — собрать release и опубликовать на GitHub (тег $(TAG))"
-	@echo "  make install  — установить debug на подключённое устройство"
-	@echo "  make clean    — очистить артефакты сборки"
+	@echo "  make setup           — local.properties и права на gradlew"
+	@echo "  make keystore        — создать release.keystore для подписи APK"
+	@echo "  make debug           — debug APK ($(APK_DEBUG))"
+	@echo "  make release         — release APK ($(APK_RELEASE))"
+	@echo "  make publish         — собрать release и опубликовать на GitHub (тег $(TAG))"
+	@echo "  make install         — установить debug на подключённое устройство"
+	@echo "  make install-release — удалить приложение и установить release APK"
+	@echo "  make clean           — очистить артефакты сборки"
 	@echo ""
 	@echo "Переменные: JAVA_HOME=$(JAVA_HOME), ANDROID_SDK=$(ANDROID_SDK), GITHUB_REPO=$(GITHUB_REPO)"
 
@@ -80,6 +83,14 @@ publish: release
 
 install: setup
 	$(GRADLE) installDebug
+
+install-release: release
+	@command -v $(ADB) >/dev/null || { echo "adb не найден: $(ADB)"; exit 1; }
+	@test -f $(APK_RELEASE) || { echo "APK не найден: $(APK_RELEASE)"; exit 1; }
+	@echo "Удаляю $(PACKAGE) (если установлен)..."
+	@$(ADB) uninstall $(PACKAGE) >/dev/null 2>&1 || true
+	@echo "Устанавливаю $(APK_RELEASE)..."
+	$(ADB) install -r $(APK_RELEASE)
 
 clean: setup
 	$(GRADLE) clean

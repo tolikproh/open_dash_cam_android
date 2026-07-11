@@ -15,7 +15,7 @@ public final class RecordingLocationSnapshot {
 
     public static RecordingLocationSnapshot from(RecordingLocationTracker tracker) {
         if (tracker == null) {
-            return empty(null);
+            return empty(OpenDashApp.getAppContext());
         }
         return new RecordingLocationSnapshot(
                 tracker.getCoordinatesLine(),

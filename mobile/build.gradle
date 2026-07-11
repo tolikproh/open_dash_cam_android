@@ -33,6 +33,10 @@ android {
                 keyAlias 'androiddebugkey'
                 keyPassword 'android'
             }
+            // Broader installer compatibility (some OEM package installers are picky).
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
         }
     }
 
