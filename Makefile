@@ -9,6 +9,8 @@ KEYSTORE := release.keystore
 KEYSTORE_PROPS := keystore.properties
 PACKAGE := com.opendashcam
 ADB ?= $(ANDROID_SDK)/platform-tools/adb
+# Optional: make install-release SERIAL=10.1.99.49:41967
+SERIAL ?= $(ANDROID_SERIAL)
 
 VERSION := $(shell grep 'versionName' mobile/build.gradle | sed -n "s/.*versionName ['\"]\([^'\"]*\)['\"].*/\1/p" | head -1)
 TAG := v$(VERSION)
@@ -33,6 +35,7 @@ help:
 	@echo "  make clean           — очистить артефакты сборки"
 	@echo ""
 	@echo "Переменные: JAVA_HOME=$(JAVA_HOME), ANDROID_SDK=$(ANDROID_SDK), GITHUB_REPO=$(GITHUB_REPO)"
+	@echo "  SERIAL / ANDROID_SERIAL — serial устройства при нескольких adb-подключениях"
 
 setup: local.properties
 	@chmod +x $(GRADLEW)
@@ -82,15 +85,39 @@ publish: release
 	@echo "GitHub release: $$($(GH) release view $(TAG) --json url -q .url)"
 
 install: setup
-	$(GRADLE) installDebug
+	@if [ -n "$(SERIAL)" ]; then \
+		ANDROID_SERIAL="$(SERIAL)" $(GRADLE) installDebug; \
+	else \
+		$(GRADLE) installDebug; \
+	fi
+
+# Resolve target device when several adb connections exist (same phone via IP + mDNS).
+define resolve-adb-serial
+	serial="$(SERIAL)"; \
+	if [ -z "$$serial" ]; then \
+		mapfile -t _devs < <($(ADB) devices | awk 'NR>1 && $$2=="device" {print $$1}'); \
+		if [ $${#_devs[@]} -eq 0 ]; then \
+			echo "Нет подключённых устройств (adb devices)"; exit 1; \
+		elif [ $${#_devs[@]} -eq 1 ]; then \
+			serial="$${_devs[0]}"; \
+		else \
+			echo "Несколько adb-устройств. Укажите SERIAL=..."; \
+			$(ADB) devices -l; \
+			echo "Пример: make install-release SERIAL=$${_devs[0]}"; \
+			exit 1; \
+		fi; \
+	fi
+endef
 
 install-release: release
-	@command -v $(ADB) >/dev/null || { echo "adb не найден: $(ADB)"; exit 1; }
+	@test -x $(ADB) || { echo "adb не найден: $(ADB)"; exit 1; }
 	@test -f $(APK_RELEASE) || { echo "APK не найден: $(APK_RELEASE)"; exit 1; }
-	@echo "Удаляю $(PACKAGE) (если установлен)..."
-	@$(ADB) uninstall $(PACKAGE) >/dev/null 2>&1 || true
-	@echo "Устанавливаю $(APK_RELEASE)..."
-	$(ADB) install -r $(APK_RELEASE)
+	@$(resolve-adb-serial); \
+	echo "Устройство: $$serial"; \
+	echo "Удаляю $(PACKAGE) (если установлен)..."; \
+	$(ADB) -s "$$serial" uninstall $(PACKAGE) >/dev/null 2>&1 || true; \
+	echo "Устанавливаю $(APK_RELEASE)..."; \
+	$(ADB) -s "$$serial" install -r $(APK_RELEASE)
 
 clean: setup
 	$(GRADLE) clean
